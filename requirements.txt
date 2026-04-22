@@ -1,0 +1,4 @@
+av2
+streamlit
+matplotlib
+numpy
