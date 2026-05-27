@@ -1,0 +1,51 @@
+[presets.default]
+label = "Default (no preset)"
+path = ""
+lane_width_min = 2.0
+lane_width_max = 5.0
+curvature_min = 0.0
+curvature_max = 3.0
+num_agents_min = 1
+num_agents_max = 150
+has_crosswalk = false
+has_roundabout = false
+max_results = 10
+
+[presets.eu_urban]
+label = "EU Urban Samples"
+path = "D:/argoverse2/eu_urban"
+lane_width_min = 2.5
+lane_width_max = 4.0
+curvature_min = 0.0
+curvature_max = 2.0
+num_agents_min = 3
+num_agents_max = 150
+has_crosswalk = true
+has_roundabout = false
+max_results = 20
+
+[presets.eu_roundabout]
+label = "EU Roundabout Samples"
+path = "D:/argoverse2/eu_roundabout"
+lane_width_min = 2.0
+lane_width_max = 5.0
+curvature_min = 0.5
+curvature_max = 3.0
+num_agents_min = 1
+num_agents_max = 150
+has_crosswalk = false
+has_roundabout = true
+max_results = 20
+
+[presets.eu_highway]
+label = "EU Highway Samples"
+path = "D:/argoverse2/eu_highway"
+lane_width_min = 3.0
+lane_width_max = 5.0
+curvature_min = 0.0
+curvature_max = 0.5
+num_agents_min = 2
+num_agents_max = 50
+has_crosswalk = false
+has_roundabout = false
+max_results = 15
