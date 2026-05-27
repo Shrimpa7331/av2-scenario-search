@@ -2,3 +2,5 @@ av2
 streamlit
 matplotlib
 numpy
+tomli-w
+tomli
