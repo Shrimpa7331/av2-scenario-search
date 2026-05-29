@@ -1,4 +1,5 @@
 from pathlib import Path
+import numpy as np
 import streamlit as st
 from src.loader import get_scenario_dirs, load_scenario, load_map
 from src.features import extract_features
@@ -12,10 +13,10 @@ def run_search(filters: dict) -> list[dict]:
     dataset_path: Path = filters["dataset_path"]
     scenario_dirs = get_scenario_dirs(dataset_path)
 
-    lane_width_min, lane_width_max = filters["lane_width"]
-    curvature_min, curvature_max = filters["curvature"]
-    agents_min, agents_max = filters["num_agents"]
+   
+
     max_results = filters["max_results"]
+    
 
     results = []
     progress = st.progress(0, text="Searching scenarios...")
@@ -30,17 +31,10 @@ def run_search(filters: dict) -> list[dict]:
         except Exception:
             continue
 
-        # Apply filters
-        if not (lane_width_min <= features["avg_lane_width"] <= lane_width_max):
-            continue
-        if not (curvature_min <= features["max_curvature"] <= curvature_max):
-            continue
-        if not (agents_min <= features["num_agents"] <= agents_max):
-            continue
-        if filters["has_crosswalk"] and not features["has_crosswalk"]:
-            continue
-        if filters["has_roundabout"] and not features["is_roundabout"]:
-            continue
+        # Apply filter
+        
+        if apply_filters(scenario, filters, avm) == False:
+          continue
 
         results.append({
             "scenario_id": scenario_path.name,
@@ -53,3 +47,150 @@ def run_search(filters: dict) -> list[dict]:
 
     progress.empty()
     return results
+def apply_filters(scenario, filters :dict, avm) -> bool:
+    
+    lane_width_min, lane_width_max = filters["lane_width"]
+    curvature_min, curvature_max = filters["curvature"]
+    num_agents_min, num_agents_max = filters["num_agents"]
+    num_lanes_min, num_lanes_max = filters["num_lanes"]
+    num_stops_min, num_stops_max = filters["num_stops"]
+
+    has_crosswalk = filters["has_crosswalk"]
+    has_roundabout = filters["has_roundabout"]
+    has_intersection = filters["has_intersection"]
+
+    
+   
+
+    # filter lane width
+    min_lane_width = float("inf")
+    max_lane_width = 0.0
+
+    for lane in avm.vector_lane_segments.values():
+        left = lane.left_lane_boundary.xyz
+        right = lane.right_lane_boundary.xyz
+
+        n = min(len(left), len(right))
+
+        widths = np.linalg.norm(
+            left[:n, :2] - right[:n, :2],
+            axis=1
+        )
+
+        min_lane_width = min(min_lane_width, np.min(widths))
+        max_lane_width = max(max_lane_width, np.max(widths))
+
+    if min_lane_width < lane_width_min:
+        return False
+
+    if max_lane_width > lane_width_max:
+        return False
+
+
+    # check curvature
+    for lane in avm.vector_lane_segments.values():
+
+        left = lane.left_lane_boundary.xyz
+        right = lane.right_lane_boundary.xyz
+
+        n = min(len(left), len(right))
+
+        points = (left[:n, :2] + right[:n, :2]) / 2
+        n = len(points)
+
+        if n < 3:
+            continue
+
+        step = max(1, n // 10)
+
+        max_curv = 0.0
+        min_curv = float("inf")
+
+        for i in range(0, n - 2 * step, step):
+
+            p1 = points[i]
+            p2 = points[i + step]
+            p3 = points[i + 2 * step]
+
+            a = np.linalg.norm(p2 - p1)
+            b = np.linalg.norm(p3 - p2)
+            c = np.linalg.norm(p3 - p1)
+
+            area = abs(np.cross(p2 - p1, p3 - p1)) / 2
+
+            if area < 1e-9:
+                continue
+
+            k = 4 * area / (a * b * c)
+
+            max_curv = max(max_curv, k)
+            min_curv = min(min_curv, k)
+
+        if min_curv < curvature_min:
+            return False
+
+        if max_curv > curvature_max:
+            return False
+    #filter num_agents
+    number_oof_agents = len(scenario.tracks)
+    if num_agents_min > number_oof_agents:
+        return False  
+    if num_agents_max < number_oof_agents:
+        return False   
+    #filter num_lanes
+    nmr_lanes = len(avm.vector_lane_segments)
+    if num_lanes_min > nmr_lanes:
+        return False  
+    if num_lanes_max < nmr_lanes:
+        return False  
+    #filter number of stop signs
+    estimated_stop_signs = (
+    sum(
+            1 for lane in avm.vector_lane_segments.values()
+            if lane.is_intersection
+        ) * 4
+    )
+
+    if num_stops_min > estimated_stop_signs:
+        return False
+
+    if num_stops_max < estimated_stop_signs:
+        return False
+    
+    # filter crosswalk num_crosswalks = len(avm.vector_pedestrian_crossings)
+    num_crosswalks = len(avm.vector_pedestrian_crossings)
+    if has_crosswalk and num_crosswalks == 0:
+        return False
+    
+    #har round about
+    if has_roundabout:
+
+        found_roundabout = False
+
+        for lane in avm.vector_lane_segments.values():
+
+            left = lane.left_lane_boundary.xyz
+            right = lane.right_lane_boundary.xyz
+
+            n = min(len(left), len(right))
+
+            if n < 2:
+                continue
+
+            points = (left[:n, :2] + right[:n, :2]) / 2
+
+            start_point = points[0]
+            end_point = points[-1]
+
+            if np.linalg.norm(end_point - start_point) < 5.0:
+                found_roundabout = True
+                break
+
+        if not found_roundabout:
+            return False
+    # har intersection 
+    for lane in avm.vector_lane_segments.values():
+        if lane.is_intersection == False and has_intersection:
+            return False
+            
+    

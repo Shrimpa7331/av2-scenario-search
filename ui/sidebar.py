@@ -119,6 +119,18 @@ def render_sidebar() -> dict:
         step=1,
         help="Filter by number of agents in the scenario"
     )
+    num_lanes = st.sidebar.slider(
+        "Number of lanes",
+        min_value=1, max_value=4,
+        value=(1, 4), step=1,
+        help="Filter by number of lanes in the scenario"
+    )
+    num_stops = st.sidebar.slider(
+        "Number of stop signs",
+        min_value=0, max_value=10,
+        value=(0, 10), step=1,
+        help="Filter by number of lanes in the scenario"
+    )
 
     has_crosswalk = st.sidebar.checkbox(
         "Must have crosswalk",
@@ -182,8 +194,12 @@ def render_sidebar() -> dict:
         "lane_width": lane_width,
         "curvature": curvature,
         "num_agents": num_agents,
+        "num_lanes": num_lanes,
+        "num_stops": num_stops,
         "has_crosswalk": has_crosswalk,
         "has_roundabout": has_roundabout,
+        "has_intersection": has_intersection,
         "max_results": max_results,
         "searched": searched,
+
     }
