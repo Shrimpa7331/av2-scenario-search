@@ -22,6 +22,9 @@ def run_search(filters: dict) -> list[dict]:
     progress = st.progress(0, text="Searching scenarios...")
 
     for i, scenario_path in enumerate(scenario_dirs):
+        if i >= max_results+1:
+            return results
+
         progress.progress(i / len(scenario_dirs), text=f"Scanning scenario {i+1} / {len(scenario_dirs)}...")
 
         try:
@@ -42,9 +45,7 @@ def run_search(filters: dict) -> list[dict]:
             **features,
         })
 
-        if len(results) >= max_results:
-            break
-
+        
     progress.empty()
     return results
 def apply_filters(scenario, filters :dict, avm) -> bool:

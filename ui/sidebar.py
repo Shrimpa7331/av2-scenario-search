@@ -140,12 +140,15 @@ def render_sidebar() -> dict:
         "Must be roundabout",
         key="filter_has_roundabout"
     )
-
+    has_intersection = st.sidebar.checkbox(
+        "Must have intersection",
+        key="filter_has_intersection"
+    )
     st.sidebar.divider()
 
     max_results = st.sidebar.number_input(
-        "Max results to show",
-        min_value=1, max_value=100,
+        "Max searches",
+        min_value=1, max_value=20000,
         key="filter_max_results",
         step=1
     )
@@ -178,6 +181,7 @@ def render_sidebar() -> dict:
                     "has_crosswalk": has_crosswalk,
                     "has_roundabout": has_roundabout,
                     "max_results": int(max_results),
+                    "has_intersection": has_intersection
                 }
                 save_presets(presets)
                 st.success(f"✅ Preset '{new_label.strip()}' saved!")
