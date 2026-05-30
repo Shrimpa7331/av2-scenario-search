@@ -98,7 +98,7 @@ def render_sidebar() -> dict:
 
     lane_width = st.sidebar.slider(
         "Lane width (m)",
-        min_value=1.0, max_value=10.0,
+        min_value=1.0, max_value=50.0,
         key="filter_lane_width",
         step=0.1,
         help="Filter scenarios by average lane width"
@@ -106,7 +106,7 @@ def render_sidebar() -> dict:
 
     curvature = st.sidebar.slider(
         "Lane curvature (rad)",
-        min_value=0.0, max_value=3.0,
+        min_value=0.0, max_value=30.0,
         key="filter_curvature",
         step=0.1,
         help="Filter scenarios by maximum lane curvature"
@@ -121,14 +121,14 @@ def render_sidebar() -> dict:
     )
     num_lanes = st.sidebar.slider(
         "Number of lanes",
-        min_value=1, max_value=4,
-        value=(1, 4), step=1,
+        min_value=1, max_value=200,
+        value=(1, 200), step=1,
         help="Filter by number of lanes in the scenario"
     )
     num_stops = st.sidebar.slider(
         "Number of stop signs",
-        min_value=0, max_value=10,
-        value=(0, 10), step=1,
+        min_value=0, max_value=150,
+        value=(0, 150), step=1,
         help="Filter by number of lanes in the scenario"
     )
 
