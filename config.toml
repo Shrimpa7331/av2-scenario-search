@@ -7,8 +7,13 @@ curvature_min = 0.0
 curvature_max = 3.0
 num_agents_min = 1
 num_agents_max = 150
+num_lanes_min = 1
+num_lanes_max = 200
+num_stops_min = 0
+num_stops_max = 150
 has_crosswalk = false
 has_roundabout = false
+has_intersection = false
 max_results = 10
 
 [presets.eu_urban]
@@ -20,8 +25,13 @@ curvature_min = 0.0
 curvature_max = 2.0
 num_agents_min = 3
 num_agents_max = 150
+num_lanes_min = 1
+num_lanes_max = 200
+num_stops_min = 0
+num_stops_max = 150
 has_crosswalk = true
 has_roundabout = false
+has_intersection = true
 max_results = 20
 
 [presets.eu_roundabout]
@@ -33,8 +43,13 @@ curvature_min = 0.5
 curvature_max = 3.0
 num_agents_min = 1
 num_agents_max = 150
+num_lanes_min = 1
+num_lanes_max = 200
+num_stops_min = 0
+num_stops_max = 150
 has_crosswalk = false
 has_roundabout = true
+has_intersection = false
 max_results = 20
 
 [presets.eu_highway]
@@ -46,6 +61,11 @@ curvature_min = 0.0
 curvature_max = 0.5
 num_agents_min = 2
 num_agents_max = 50
+num_lanes_min = 1
+num_lanes_max = 200
+num_stops_min = 0
+num_stops_max = 150
 has_crosswalk = false
 has_roundabout = false
+has_intersection = false
 max_results = 15

@@ -42,8 +42,17 @@ def _apply_preset_to_state(preset: dict):
         int(preset.get("num_agents_min", 1)),
         int(preset.get("num_agents_max", 150)),
     )
+    st.session_state["filter_num_lanes"] = (
+        int(preset.get("num_lanes_min", 1)),
+        int(preset.get("num_lanes_max", 200)),
+    )
+    st.session_state["filter_num_stops"] = (
+        int(preset.get("num_stops_min", 0)),
+        int(preset.get("num_stops_max", 150)),
+    )
     st.session_state["filter_has_crosswalk"] = bool(preset.get("has_crosswalk", False))
     st.session_state["filter_has_roundabout"] = bool(preset.get("has_roundabout", False))
+    st.session_state["filter_has_intersection"] = bool(preset.get("has_intersection", False))
     st.session_state["filter_max_results"] = int(preset.get("max_results", 10))
 
 
@@ -122,14 +131,16 @@ def render_sidebar() -> dict:
     num_lanes = st.sidebar.slider(
         "Number of lanes",
         min_value=1, max_value=200,
-        value=(1, 200), step=1,
+        key="filter_num_lanes",
+        step=1,
         help="Filter by number of lanes in the scenario"
     )
     num_stops = st.sidebar.slider(
         "Number of stop signs",
         min_value=0, max_value=150,
-        value=(0, 150), step=1,
-        help="Filter by number of lanes in the scenario"
+        key="filter_num_stops",
+        step=1,
+        help="Filter by number of stop signs in the scenario"
     )
 
     has_crosswalk = st.sidebar.checkbox(
