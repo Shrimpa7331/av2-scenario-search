@@ -1,8 +1,17 @@
+import json
 from pathlib import Path
 import numpy as np
 import streamlit as st
 from src.loader import get_scenario_dirs, load_scenario, load_map
 from src.features import extract_features
+
+FLAGS_FILE = Path(__file__).parent.parent / "flags.json"
+
+def load_flags() -> dict:
+    if FLAGS_FILE.exists():
+        with open(FLAGS_FILE, "r") as f:
+            return json.load(f)
+    return {}
 
 
 def run_search(filters: dict) -> list[dict]:
@@ -15,17 +24,24 @@ def run_search(filters: dict) -> list[dict]:
 
    
 
-    max_results = filters["max_results"]
-    
+    scan_offset = filters.get("scan_offset", 0)
+    goal_results = filters["goal_results"]
+    max_scans = filters["max_scans"]
+    flags = load_flags()
+
+    scenario_dirs = scenario_dirs[scan_offset:]
+    total_to_scan = min(len(scenario_dirs), max_scans)
 
     results = []
     progress = st.progress(0, text="Searching scenarios...")
 
     for i, scenario_path in enumerate(scenario_dirs):
-        if i >= max_results:
-            return results
+        if i >= max_scans:
+            break
+        if len(results) >= goal_results:
+            break
 
-        progress.progress(i / len(scenario_dirs), text=f"Scanning scenario {i+1} / {len(scenario_dirs)}...")
+        progress.progress(i / total_to_scan if total_to_scan > 0 else 1, text=f"Scanning {scan_offset + i + 1} / {scan_offset + total_to_scan} — {len(results)} found...")
 
         try:
             scenario = load_scenario(scenario_path)
@@ -34,10 +50,18 @@ def run_search(filters: dict) -> list[dict]:
         except Exception:
             continue
 
+        # Apply flags — override detected features with researcher corrections
+        scenario_flags = flags.get(scenario_path.name, {})
+        if scenario_flags.get("fake_roundabout"):
+            features["is_roundabout"] = False
+        if scenario_flags.get("fake_crosswalk"):
+            features["has_crosswalk"] = False
+        if scenario_flags.get("fake_intersection"):
+            features["fake_intersection"] = True  # passed to apply_filters
+
         # Apply filter
-        
-        if apply_filters(scenario, filters, avm) == False:
-          continue
+        if apply_filters(scenario, filters, avm, features) == False:
+            continue
 
         results.append({
             "scenario_id": scenario_path.name,
@@ -48,7 +72,7 @@ def run_search(filters: dict) -> list[dict]:
         
     progress.empty()
     return results
-def apply_filters(scenario, filters :dict, avm) -> bool:
+def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
     
     lane_width_min, lane_width_max = filters["lane_width"]
     curvature_min, curvature_max = filters["curvature"]
@@ -100,45 +124,27 @@ def apply_filters(scenario, filters :dict, avm) -> bool:
             min_curv = min(min_curv, k)
 
         if min_curv < curvature_min:
-            st.write(
-                f"FAIL curvature_min: actual={min_curv:.4f}, filter={curvature_min:.4f}"
-            )
             return False
 
         if max_curv > curvature_max:
-            st.write(
-                f"FAIL curvature_max: actual={max_curv:.4f}, filter={curvature_max:.4f}"
-            )
             return False
 
     # filter num_agents
     number_oof_agents = len(scenario.tracks)
 
     if num_agents_min > number_oof_agents:
-        st.write(
-            f"FAIL num_agents_min: actual={number_oof_agents}, filter={num_agents_min}"
-        )
         return False
 
     if num_agents_max < number_oof_agents:
-        st.write(
-            f"FAIL num_agents_max: actual={number_oof_agents}, filter={num_agents_max}"
-        )
         return False
 
     # filter num_lanes
     nmr_lanes = len(avm.vector_lane_segments)
 
     if num_lanes_min > nmr_lanes:
-        st.write(
-            f"FAIL num_lanes_min: actual={nmr_lanes}, filter={num_lanes_min}"
-        )
         return False
 
     if num_lanes_max < nmr_lanes:
-        st.write(
-            f"FAIL num_lanes_max: actual={nmr_lanes}, filter={num_lanes_max}"
-        )
         return False
 
     # filter number of stop signs
@@ -150,58 +156,26 @@ def apply_filters(scenario, filters :dict, avm) -> bool:
     )
 
     if num_stops_min > estimated_stop_signs:
-        st.write(
-            f"FAIL num_stops_min: actual={estimated_stop_signs}, filter={num_stops_min}"
-        )
         return False
 
     if num_stops_max < estimated_stop_signs:
-        st.write(
-            f"FAIL num_stops_max: actual={estimated_stop_signs}, filter={num_stops_max}"
-        )
         return False
 
     # filter crosswalk
     num_crosswalks = len(avm.vector_pedestrian_crossings)
 
     if has_crosswalk and num_crosswalks == 0:
-        st.write(
-            f"FAIL crosswalk: actual={num_crosswalks}"
-        )
         return False
 
-    # har roundabout
-    if has_roundabout:
-
-        found_roundabout = False
-
-        for lane in avm.vector_lane_segments.values():
-
-            left = lane.left_lane_boundary.xyz
-            right = lane.right_lane_boundary.xyz
-
-            n = min(len(left), len(right))
-
-            if n < 2:
-                continue
-
-            points = (left[:n, :2] + right[:n, :2]) / 2
-
-            start_point = points[0]
-            end_point = points[-1]
-
-            if np.linalg.norm(end_point - start_point) < 5.0:
-                found_roundabout = True
-                break
-
-        if not found_roundabout:
-            st.write("FAIL roundabout")
-            return False
+    # har roundabout — use features.py result (graph-based, reliable)
+    if has_roundabout and not features["is_roundabout"]:
+        return False
 
     # har intersection
-    for lane in avm.vector_lane_segments.values():
-        if lane.is_intersection == False and has_intersection:
-            st.write("FAIL intersection")
+    if has_intersection:
+        if features.get("fake_intersection"):
+            return False
+        if not any(lane.is_intersection for lane in avm.vector_lane_segments.values()):
             return False
 
     # filter lane width
@@ -229,16 +203,11 @@ def apply_filters(scenario, filters :dict, avm) -> bool:
             min_lane_width = min_lane_width1
         if max_lane_width > max_lane_width1:
             max_lane_width = max_lane_width1
+
     if min_lane_width < lane_width_min:
-        st.write(
-            f"FAIL lane_width_min: actual={min_lane_width:.2f} m, filter={lane_width_min:.2f} m"
-        )
         return False
 
     if max_lane_width > lane_width_max:
-        st.write(
-            f"FAIL lane_width_max: actual={max_lane_width:.2f} m, filter={lane_width_max:.2f} m"
-        )
         return False
 
     return True

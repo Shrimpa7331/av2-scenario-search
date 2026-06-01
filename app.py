@@ -29,10 +29,14 @@ if filters["dataset_path"] is None:
     """)
 
 elif not filters["searched"]:
-    # Dataset loaded, waiting for search
-    st.success(f"✅ Dataset loaded: `{filters['dataset_path']}`")
-    st.markdown("Set your filters in the sidebar and hit **Search** to find scenarios.")
+    # Dataset loaded — show cached results if available, otherwise wait
+    if st.session_state.get("_search_results") is not None:
+        render_results(filters)
+    else:
+        st.success(f"✅ Dataset loaded: `{filters['dataset_path']}`")
+        st.markdown("Set your filters in the sidebar and hit **Search** to find scenarios.")
 
 else:
-    # Show results
+    # Search button pressed — clear cache so a fresh search runs
+    st.session_state["_search_results"] = None
     render_results(filters)

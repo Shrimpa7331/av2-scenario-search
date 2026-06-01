@@ -53,7 +53,9 @@ def _apply_preset_to_state(preset: dict):
     st.session_state["filter_has_crosswalk"] = bool(preset.get("has_crosswalk", False))
     st.session_state["filter_has_roundabout"] = bool(preset.get("has_roundabout", False))
     st.session_state["filter_has_intersection"] = bool(preset.get("has_intersection", False))
-    st.session_state["filter_max_results"] = int(preset.get("max_results", 10))
+    st.session_state["filter_scan_offset"] = int(preset.get("scan_offset", 0))
+    st.session_state["filter_goal_results"] = int(preset.get("goal_results", 10))
+    st.session_state["filter_max_scans"] = int(preset.get("max_scans", 1000))
 
 
 def render_sidebar() -> dict:
@@ -85,7 +87,7 @@ def render_sidebar() -> dict:
     dataset_path_str = st.sidebar.text_input(
         "Dataset path",
         key="filter_path",
-        placeholder=r"e.g. D:\argoverse2\val",
+        placeholder=r"e.g. D:/argoverse2/val",
         help="Path to your local Argoverse 2 motion forecasting folder"
     )
 
@@ -94,7 +96,8 @@ def render_sidebar() -> dict:
     if dataset_path_str:
         p = Path(dataset_path_str)
         if p.exists() and p.is_dir():
-            scenario_count = count_scenarios(p)
+            with st.sidebar.spinner("Loading dataset..."):
+                scenario_count = count_scenarios(p)
             st.sidebar.success(f"✅ {scenario_count} scenarios found")
             dataset_path = p
         else:
@@ -157,11 +160,26 @@ def render_sidebar() -> dict:
     )
     st.sidebar.divider()
 
-    max_results = st.sidebar.number_input(
-        "Max searches",
-        min_value=1, max_value=20000,
-        key="filter_max_results",
-        step=1
+    scan_offset = st.sidebar.number_input(
+        "Start from position",
+        min_value=0, max_value=250000,
+        key="filter_scan_offset",
+        step=100,
+        help="Skip the first N scenarios — useful for paging through large datasets"
+    )
+    goal_results = st.sidebar.number_input(
+        "Goal results",
+        min_value=1, max_value=10000,
+        key="filter_goal_results",
+        step=1,
+        help="Stop when this many matching scenarios are found"
+    )
+    max_scans = st.sidebar.number_input(
+        "Max scenarios to scan",
+        min_value=1, max_value=250000,
+        key="filter_max_scans",
+        step=100,
+        help="Give up after scanning this many scenarios, even if goal not reached"
     )
 
     searched = False
@@ -173,33 +191,51 @@ def render_sidebar() -> dict:
     # --- Preset management ---
     st.sidebar.header("💾 Manage Presets")
 
-    with st.sidebar.expander("Save current settings as preset"):
+    def current_preset_data(label):
+        return {
+            "label": label,
+            "path": dataset_path_str,
+            "lane_width_min": lane_width[0],
+            "lane_width_max": lane_width[1],
+            "curvature_min": curvature[0],
+            "curvature_max": curvature[1],
+            "num_agents_min": num_agents[0],
+            "num_agents_max": num_agents[1],
+            "num_lanes_min": num_lanes[0],
+            "num_lanes_max": num_lanes[1],
+            "num_stops_min": num_stops[0],
+            "num_stops_max": num_stops[1],
+            "has_crosswalk": has_crosswalk,
+            "has_roundabout": has_roundabout,
+            "has_intersection": has_intersection,
+            "scan_offset": int(scan_offset),
+            "goal_results": int(goal_results),
+            "max_scans": int(max_scans),
+        }
+
+    # Update current preset (not allowed for default)
+    if selected_key != "default":
+        if st.sidebar.button(f"💾 Update '{selected_label}'", use_container_width=True):
+            presets[selected_key] = current_preset_data(selected_label)
+            save_presets(presets)
+            st.sidebar.success(f"✅ '{selected_label}' updated!")
+            st.rerun()
+
+    # Save as new preset
+    with st.sidebar.expander("Save as new preset"):
         new_label = st.text_input("Preset name", placeholder="e.g. EU Urban Night")
-        if st.button("💾 Save preset", use_container_width=True):
+        if st.button("💾 Save as new", use_container_width=True):
             if not new_label.strip():
                 st.error("Please enter a name for the preset.")
             else:
                 new_key = new_label.strip().lower().replace(" ", "_")
-                presets[new_key] = {
-                    "label": new_label.strip(),
-                    "path": dataset_path_str,
-                    "lane_width_min": lane_width[0],
-                    "lane_width_max": lane_width[1],
-                    "curvature_min": curvature[0],
-                    "curvature_max": curvature[1],
-                    "num_agents_min": num_agents[0],
-                    "num_agents_max": num_agents[1],
-                    "has_crosswalk": has_crosswalk,
-                    "has_roundabout": has_roundabout,
-                    "max_results": int(max_results),
-                    "has_intersection": has_intersection
-                }
+                presets[new_key] = current_preset_data(new_label.strip())
                 save_presets(presets)
                 st.success(f"✅ Preset '{new_label.strip()}' saved!")
                 st.rerun()
 
     if selected_key != "default":
-        if st.sidebar.button(f"🗑️ Delete preset '{selected_label}'", use_container_width=True):
+        if st.sidebar.button(f"🗑️ Delete '{selected_label}'", use_container_width=True):
             del presets[selected_key]
             save_presets(presets)
             st.rerun()
@@ -214,7 +250,8 @@ def render_sidebar() -> dict:
         "has_crosswalk": has_crosswalk,
         "has_roundabout": has_roundabout,
         "has_intersection": has_intersection,
-        "max_results": max_results,
+        "scan_offset": scan_offset,
+        "goal_results": goal_results,
+        "max_scans": max_scans,
         "searched": searched,
-
     }
