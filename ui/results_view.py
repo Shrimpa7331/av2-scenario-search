@@ -143,6 +143,11 @@ def render_results(filters: dict):
                         st.session_state["flags"][scenario_id] = updated
                         save_flags(st.session_state["flags"])
                         st.success("Flag saved — takes effect on next search.")
+                    if has_flags:
+                        if st.button("🗑️ Clear all flags", key=f"clear_flags_{scenario_id}"):
+                            st.session_state["flags"].pop(scenario_id, None)
+                            save_flags(st.session_state["flags"])
+                            st.rerun()
 
             # HD map
             st.markdown("**HD Map**")

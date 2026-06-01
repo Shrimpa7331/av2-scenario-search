@@ -54,6 +54,7 @@ def _apply_preset_to_state(preset: dict):
     st.session_state["filter_has_crosswalk"] = bool(preset.get("has_crosswalk", False))
     st.session_state["filter_has_roundabout"] = bool(preset.get("has_roundabout", False))
     st.session_state["filter_has_intersection"] = bool(preset.get("has_intersection", False))
+    st.session_state["filter_roundabout_circularity"] = float(preset.get("roundabout_circularity", 0.95))
     st.session_state["filter_scan_offset"] = int(preset.get("scan_offset", 0))
     st.session_state["filter_goal_results"] = int(preset.get("goal_results", 10))
     st.session_state["filter_max_scans"] = int(preset.get("max_scans", 1000))
@@ -154,6 +155,16 @@ def render_sidebar() -> dict:
         "Must be roundabout",
         key="filter_has_roundabout"
     )
+    if has_roundabout:
+        roundabout_circularity = st.sidebar.slider(
+            "Circularity threshold",
+            min_value=0.1, max_value=1.0,
+            key="filter_roundabout_circularity",
+            step=0.05,
+            help="How circular the roundabout must be (0.99 = near-perfect circle). Lower = more permissive."
+        )
+    else:
+        roundabout_circularity = st.session_state.get("filter_roundabout_circularity", 0.95)
     has_intersection = st.sidebar.checkbox(
         "Must have intersection",
         key="filter_has_intersection"
@@ -240,6 +251,28 @@ def render_sidebar() -> dict:
             save_presets(presets)
             st.rerun()
 
+    st.sidebar.divider()
+    st.sidebar.header("🚩 Flags")
+    flags_file = Path(__file__).parent.parent / "flags.json"
+    if flags_file.exists() and flags_file.stat().st_size > 0:
+        import json
+        with open(flags_file, "r") as f:
+            content = f.read().strip()
+            existing_flags = json.loads(content) if content else {}
+        flagged_count = sum(1 for v in existing_flags.values() if any(v.values()))
+        if flagged_count > 0:
+            st.sidebar.caption(f"{flagged_count} scenario(s) flagged")
+            if st.sidebar.button("🗑️ Clear all flags", use_container_width=True):
+                flags_file.write_text("{}")
+                if "flags" in st.session_state:
+                    st.session_state["flags"] = {}
+                st.sidebar.success("All flags cleared.")
+                st.rerun()
+        else:
+            st.sidebar.caption("No flags set.")
+    else:
+        st.sidebar.caption("No flags set.")
+
     return {
         "dataset_path": dataset_path,
         "lane_width": lane_width,
@@ -249,6 +282,7 @@ def render_sidebar() -> dict:
         "num_stops": num_stops,
         "has_crosswalk": has_crosswalk,
         "has_roundabout": has_roundabout,
+        "roundabout_circularity": roundabout_circularity,
         "has_intersection": has_intersection,
         "scan_offset": scan_offset,
         "goal_results": goal_results,
