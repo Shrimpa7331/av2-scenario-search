@@ -99,30 +99,34 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
         if n < 3:
             continue
 
-        step = max(1, n // 10)
+        vectors = np.diff(points, axis=0)
+        norms = np.linalg.norm(vectors, axis=1)
+        valid_vectors = vectors[norms > 1e-6]
 
-        max_curv = 0.0
-        min_curv = float("inf")
+        if len(valid_vectors) < 2:
+            continue
 
-        for i in range(0, n - 2 * step, step):
+        headings = np.arctan2(valid_vectors[:, 1], valid_vectors[:, 0])
+        curvature_values = np.abs(np.diff(headings))
+        curvature_values = (curvature_values + np.pi) % (2 * np.pi) - np.pi
+        curvature_values = np.abs(curvature_values)
 
-            p1 = points[i]
-            p2 = points[i + step]
-            p3 = points[i + 2 * step]
+        if len(curvature_values) == 0:
+            continue
 
-            a = np.linalg.norm(p2 - p1)
-            b = np.linalg.norm(p3 - p2)
-            c = np.linalg.norm(p3 - p1)
+        avg_curv = np.mean(curvature_values)
+        min_allowed_curv = avg_curv / 3
+        max_allowed_curv = avg_curv * 3
+        filtered_curvatures = [
+            k for k in curvature_values
+            if min_allowed_curv <= k <= max_allowed_curv
+        ]
 
-            area = abs(np.cross(p2 - p1, p3 - p1)) / 2
+        if not filtered_curvatures:
+            continue
 
-            if area < 1e-9:
-                continue
-
-            k = 4 * area / (a * b * c)
-
-            max_curv = max(max_curv, k)
-            min_curv = min(min_curv, k)
+        min_curv = min(filtered_curvatures)
+        max_curv = max(filtered_curvatures)
 
         if min_curv < curvature_min:
             return False
@@ -180,30 +184,76 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
             return False
 
     # filter lane width
-    min_lane_width = float("inf")
-    max_lane_width = 0.0
+    lane_width_values = []
 
     for lane in avm.vector_lane_segments.values():
         left = lane.left_lane_boundary.xyz
         right = lane.right_lane_boundary.xyz
 
-        n = min(len(left), len(right))
+        if len(left) < 2 or len(right) < 2:
+            continue
 
-        widths = np.linalg.norm(
-            left[:n, :2] - right[:n, :2],
-            axis=1
+        left_points = left[:, :2]
+        right_points = right[:, :2]
+
+        same_direction_distance = (
+            np.linalg.norm(left_points[0] - right_points[0])
+            + np.linalg.norm(left_points[-1] - right_points[-1])
+        )
+        opposite_direction_distance = (
+            np.linalg.norm(left_points[0] - right_points[-1])
+            + np.linalg.norm(left_points[-1] - right_points[0])
         )
 
-        min_lane_width = min(min_lane_width, np.min(widths))
-        max_lane_width = max(max_lane_width, np.max(widths))
-        avg_width = np.mean(widths)
+        if opposite_direction_distance < same_direction_distance:
+            right_points = right_points[::-1]
 
-        min_lane_width1 = 0.5 * avg_width
-        max_lane_width1 = 2.0 * avg_width
-        if min_lane_width < min_lane_width1:
-            min_lane_width = min_lane_width1
-        if max_lane_width > max_lane_width1:
-            max_lane_width = max_lane_width1
+        left_dist = np.insert(
+            np.cumsum(np.linalg.norm(np.diff(left_points, axis=0), axis=1)),
+            0,
+            0.0
+        )
+        right_dist = np.insert(
+            np.cumsum(np.linalg.norm(np.diff(right_points, axis=0), axis=1)),
+            0,
+            0.0
+        )
+
+        if left_dist[-1] == 0 or right_dist[-1] == 0:
+            continue
+
+        sample_count = max(len(left_points), len(right_points))
+        left_sample_dist = np.linspace(0.0, left_dist[-1], sample_count)
+        right_sample_dist = np.linspace(0.0, right_dist[-1], sample_count)
+
+        left_interp = np.column_stack((
+            np.interp(left_sample_dist, left_dist, left_points[:, 0]),
+            np.interp(left_sample_dist, left_dist, left_points[:, 1])
+        ))
+        right_interp = np.column_stack((
+            np.interp(right_sample_dist, right_dist, right_points[:, 0]),
+            np.interp(right_sample_dist, right_dist, right_points[:, 1])
+        ))
+
+        widths = np.linalg.norm(left_interp - right_interp, axis=1)
+
+        median_width = np.median(widths)
+        min_allowed_width = median_width / 3
+        max_allowed_width = median_width * 3
+        filtered_widths = widths[
+            (widths >= min_allowed_width) & (widths <= max_allowed_width)
+        ]
+
+        if len(filtered_widths) == 0:
+            continue
+
+        lane_width_values.extend(filtered_widths)
+
+    if not lane_width_values:
+        return False
+
+    min_lane_width = np.percentile(lane_width_values, 10)
+    max_lane_width = np.percentile(lane_width_values, 90)
 
     if min_lane_width < lane_width_min:
         return False
@@ -212,3 +262,4 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
         return False
 
     return True
+

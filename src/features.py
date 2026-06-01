@@ -17,7 +17,7 @@ def compute_lane_widths(avm: ArgoverseStaticMap) -> list[float]:
 
 
 def compute_lane_curvatures(avm: ArgoverseStaticMap) -> list[float]:
-    """Return absolute total heading change per lane segment (in radians)."""
+    """Return max heading change between neighbouring lane segments (in radians)."""
     curvatures = []
     for lane_seg in avm.vector_lane_segments.values():
         left = lane_seg.left_lane_boundary.xyz
@@ -27,13 +27,14 @@ def compute_lane_curvatures(avm: ArgoverseStaticMap) -> list[float]:
             continue
         centerline = (left[:min_len, :2] + right[:min_len, :2]) / 2
         vectors = np.diff(centerline, axis=0)
-        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
-        norms = np.where(norms < 1e-6, 1e-6, norms)
-        unit_vecs = vectors / norms
-        headings = np.arctan2(unit_vecs[:, 1], unit_vecs[:, 0])
+        norms = np.linalg.norm(vectors, axis=1)
+        valid_vectors = vectors[norms > 1e-6]
+        if len(valid_vectors) < 2:
+            continue
+        headings = np.arctan2(valid_vectors[:, 1], valid_vectors[:, 0])
         changes = np.diff(headings)
         changes = (changes + np.pi) % (2 * np.pi) - np.pi
-        curvatures.append(float(abs(np.sum(changes))))
+        curvatures.append(float(np.max(np.abs(changes))))
     return curvatures
 
 
