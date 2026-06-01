@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import streamlit as st
 from src.loader import get_scenario_dirs, load_scenario, load_map
-from src.features import extract_features
+from src.features import extract_features, is_roundabout
 
 FLAGS_FILE = Path(__file__).parent.parent / "flags.json"
 
@@ -54,7 +54,7 @@ def run_search(filters: dict) -> list[dict]:
         # Apply flags — override detected features with researcher corrections
         scenario_flags = flags.get(scenario_path.name, {})
         if scenario_flags.get("fake_roundabout"):
-            features["is_roundabout"] = False
+            features["fake_roundabout"] = True  # explicit flag, checked separately in apply_filters
         if scenario_flags.get("fake_crosswalk"):
             features["has_crosswalk"] = False
         if scenario_flags.get("fake_intersection"):
@@ -168,9 +168,13 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
     if has_crosswalk and num_crosswalks == 0:
         return False
 
-    # har roundabout — use features.py result (graph-based, reliable)
-    if has_roundabout and not features["is_roundabout"]:
-        return False
+    # har roundabout — check researcher flag first, then run circularity with slider value
+    if has_roundabout:
+        if features.get("fake_roundabout"):
+            return False
+        circularity_threshold = filters.get("roundabout_circularity", 0.95)
+        if not is_roundabout(avm, circularity_threshold=circularity_threshold):
+            return False
 
     # har intersection
     if has_intersection:

@@ -42,7 +42,7 @@ def has_crosswalk(avm: ArgoverseStaticMap) -> bool:
     return len(avm.vector_pedestrian_crossings) > 0
 
 
-def is_roundabout(avm: ArgoverseStaticMap, min_cycle: int = 3, max_cycle: int = 10) -> bool:
+def is_roundabout(avm: ArgoverseStaticMap, min_cycle: int = 3, max_cycle: int = 10, circularity_threshold: float = 0.95) -> bool:
     """Detect roundabout by finding a cycle in the lane successor graph (~2pi total turn)."""
     lane_segs = avm.vector_lane_segments
     successors = {lid: seg.successors for lid, seg in lane_segs.items()}
@@ -77,13 +77,45 @@ def is_roundabout(avm: ArgoverseStaticMap, min_cycle: int = 3, max_cycle: int = 
                     return result
         return None
 
+    def cycle_circularity(cycle):
+        """Compute isoperimetric circularity of the cycle's centerline points.
+        Perfect circle = 1.0; elongated shapes approach 0."""
+        points = []
+        for lid in cycle:
+            seg = lane_segs[lid]
+            left = seg.left_lane_boundary.xyz
+            right = seg.right_lane_boundary.xyz
+            min_len = min(len(left), len(right))
+            if min_len < 2:
+                continue
+            centerline = (left[:min_len, :2] + right[:min_len, :2]) / 2
+            points.append(centerline)
+        if not points:
+            return 0.0
+        pts = np.concatenate(points, axis=0)
+
+        # Perimeter
+        diffs = np.diff(pts, axis=0)
+        perimeter = float(np.sum(np.linalg.norm(diffs, axis=1)))
+        if perimeter < 1e-6:
+            return 0.0
+
+        # Area via shoelace
+        x, y = pts[:, 0], pts[:, 1]
+        area = abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))) / 2
+
+        # Circularity: 4π·area / perimeter²  (1.0 = perfect circle)
+        return (4 * np.pi * area) / (perimeter ** 2)
+
     for lane_id in lane_segs:
         cycle = dfs(lane_id, lane_id, [lane_id], {lane_id})
         if cycle is None:
             continue
         total_turn = sum(curvature_cache.get(lid, 0.0) for lid in cycle)
         if abs(total_turn) > 4.0:
-            return True
+            circularity = cycle_circularity(cycle)
+            if circularity >= circularity_threshold:
+                return True
 
     return False
 
