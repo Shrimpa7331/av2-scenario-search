@@ -10,7 +10,8 @@ FLAGS_FILE = Path(__file__).parent.parent / "flags.json"
 def load_flags() -> dict:
     if FLAGS_FILE.exists():
         with open(FLAGS_FILE, "r") as f:
-            return json.load(f)
+            content = f.read().strip()
+            return json.loads(content) if content else {}
     return {}
 
 
