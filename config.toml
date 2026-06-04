@@ -17,30 +17,11 @@ has_intersection = false
 goal_results = 10
 max_scans = 5000
 
-[presets.na_austin_samples]
-label = "NA Austin Samples"
-path = "D:/desktop/school/Advanced Human-Computer Interaction/Laborationer/argoverse2/austin_scenarios"
-lane_width_min = 1.0
-lane_width_max = 50.0
-curvature_min = 0.0
-curvature_max = 12.0
-num_agents_min = 63
-num_agents_max = 119
-num_lanes_min = 1
-num_lanes_max = 60
-num_stops_min = 0
-num_stops_max = 50
-has_crosswalk = true
-has_roundabout = false
-has_intersection = true
-goal_results = 25
-max_scans = 3000
-
 [presets.na_miami_samples]
 label = "NA Miami Samples"
 path = "D:/desktop/school/Advanced Human-Computer Interaction/Laborationer/argoverse2/miami_scenarios"
 lane_width_min = 1.0
-lane_width_max = 50.0
+lane_width_max = 15.0
 curvature_min = 0.0
 curvature_max = 30.0
 num_agents_min = 1
@@ -48,10 +29,10 @@ num_agents_max = 150
 num_lanes_min = 1
 num_lanes_max = 200
 num_stops_min = 0
-num_stops_max = 150
+num_stops_max = 500
 has_crosswalk = false
 has_roundabout = true
 has_intersection = false
 scan_offset = 1850
 goal_results = 3
-max_scans = 250
+max_scans = 500

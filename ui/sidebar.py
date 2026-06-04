@@ -32,12 +32,12 @@ def _apply_preset_to_state(preset: dict):
     """Push preset values into session state so widgets pick them up."""
     st.session_state["filter_path"] = preset.get("path", "")
     st.session_state["filter_lane_width"] = (
-        float(preset.get("lane_width_min", 2.0)),
-        float(preset.get("lane_width_max", 5.0)),
+        min(float(preset.get("lane_width_min", 2.0)), 15.0),
+        min(float(preset.get("lane_width_max", 5.0)), 15.0),
     )
     st.session_state["filter_curvature"] = (
-        float(preset.get("curvature_min", 0.0)),
-        float(preset.get("curvature_max", 3.0)),
+        min(float(preset.get("curvature_min", 0.0)), 30.0),
+        min(float(preset.get("curvature_max", 3.0)), 30.0),
     )
     st.session_state["filter_num_agents"] = (
         int(preset.get("num_agents_min", 1)),
@@ -120,7 +120,7 @@ def render_sidebar() -> dict:
 
     curvature = st.sidebar.slider(
         "Lane curvature (rad)",
-        min_value=0.0, max_value=2 * pi,
+        min_value=0.0, max_value=30.0,
         key="filter_curvature",
         step=0.1,
         help="Filter scenarios by maximum lane curvature"

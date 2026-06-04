@@ -16,6 +16,12 @@ st.markdown("Search and explore motion forecasting scenarios by road geometry.")
 # Sidebar — dataset path + filters
 filters = render_sidebar()
 
+# Clear cached results if dataset path has changed
+current_path = str(filters["dataset_path"]) if filters["dataset_path"] else None
+if current_path != st.session_state.get("_last_dataset_path"):
+    st.session_state["_last_dataset_path"] = current_path
+    st.session_state["_search_results"] = None
+
 # Main area
 if filters["dataset_path"] is None:
     # Welcome screen
