@@ -51,7 +51,7 @@ def run_search(filters: dict) -> list[dict]:
         except Exception:
             continue
 
-        # Apply flags — override detected features with researcher corrections
+        # Apply flags, override detected features with researcher corrections
         scenario_flags = flags.get(scenario_path.name, {})
         if scenario_flags.get("fake_roundabout"):
             features["fake_roundabout"] = True  # explicit flag, checked separately in apply_filters
@@ -74,7 +74,11 @@ def run_search(filters: dict) -> list[dict]:
     progress.empty()
     return results
 def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
-    
+    """
+    Check whether a scenario matches the user-selected filters.
+    Returns True if it passes all checks, False if any filter rejects it.
+    Noisy map geometry is handled with basic outlier rejection before comparing values.
+    """
     lane_width_min, lane_width_max = filters["lane_width"]
     curvature_min, curvature_max = filters["curvature"]
     num_agents_min, num_agents_max = filters["num_agents"]
@@ -85,7 +89,8 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
     has_roundabout = filters["has_roundabout"]
     has_intersection = filters["has_intersection"]
 
-    # check curvature
+    # Check curvature per lane: compute heading changes along the centerline,
+    # then reject outliers (values outside [avg/3, avg*3]) before range-checking.
     for lane in avm.vector_lane_segments.values():
 
         left = lane.left_lane_boundary.xyz
@@ -101,6 +106,7 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
 
         vectors = np.diff(points, axis=0)
         norms = np.linalg.norm(vectors, axis=1)
+        # Skip near-zero-length segments to avoid degenerate heading values
         valid_vectors = vectors[norms > 1e-6]
 
         if len(valid_vectors) < 2:
@@ -108,12 +114,14 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
 
         headings = np.arctan2(valid_vectors[:, 1], valid_vectors[:, 0])
         curvature_values = np.abs(np.diff(headings))
+        # Wrap angle differences to [-pi, pi] to handle the 0/2pi boundary
         curvature_values = (curvature_values + np.pi) % (2 * np.pi) - np.pi
         curvature_values = np.abs(curvature_values)
 
         if len(curvature_values) == 0:
             continue
 
+        # Outlier rejection: discard values more than 3x from the mean
         avg_curv = np.mean(curvature_values)
         min_allowed_curv = avg_curv / 3
         max_allowed_curv = avg_curv * 3
@@ -153,6 +161,8 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
         return False
 
     # filter number of stop signs
+    # AV2 does not expose stop-sign counts directly; we estimate by counting
+    # intersection lanes and multiplying by 4 (typical 4-way stop assumption).
     estimated_stop_signs = (
         sum(
             1 for lane in avm.vector_lane_segments.values()
@@ -172,7 +182,7 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
     if has_crosswalk and num_crosswalks == 0:
         return False
 
-    # har roundabout — check researcher flag first, then run circularity with slider value
+    # has roundabout, check researcher flag first, then run circularity with slider value
     if has_roundabout:
         if features.get("fake_roundabout"):
             return False
@@ -180,7 +190,7 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
         if not is_roundabout(avm, circularity_threshold=circularity_threshold):
             return False
 
-    # har intersection
+    # has intersection
     if has_intersection:
         if features.get("fake_intersection"):
             return False
@@ -209,9 +219,13 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
             + np.linalg.norm(left_points[-1] - right_points[0])
         )
 
+        # Ensure left and right boundaries run in the same direction before
+        # measuring cross-lane distances (some segments store them anti-parallel).
         if opposite_direction_distance < same_direction_distance:
             right_points = right_points[::-1]
 
+        # Resample both boundaries to the same arc-length parameterisation so
+        # point-to-point distances reflect true perpendicular width.
         left_dist = np.insert(
             np.cumsum(np.linalg.norm(np.diff(left_points, axis=0), axis=1)),
             0,
@@ -241,6 +255,8 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
 
         widths = np.linalg.norm(left_interp - right_interp, axis=1)
 
+        # Outlier rejection: discard widths more than 3x from the median
+        # (handles noisy boundary points at lane ends / intersections).
         median_width = np.median(widths)
         min_allowed_width = median_width / 3
         max_allowed_width = median_width * 3
@@ -256,6 +272,8 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
     if not lane_width_values:
         return False
 
+    # Use 10th/90th percentiles rather than min/max to ignore extreme outliers
+    # across all lanes in the scenario.
     min_lane_width = np.percentile(lane_width_values, 10)
     max_lane_width = np.percentile(lane_width_values, 90)
 
