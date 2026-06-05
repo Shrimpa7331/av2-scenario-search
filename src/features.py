@@ -43,7 +43,7 @@ def has_crosswalk(avm: ArgoverseStaticMap) -> bool:
     return len(avm.vector_pedestrian_crossings) > 0
 
 
-def is_roundabout(avm: ArgoverseStaticMap, min_cycle: int = 3, max_cycle: int = 10, circularity_threshold: float = 0.95) -> bool:
+def is_roundabout(avm: ArgoverseStaticMap, min_cycle: int = 3, max_cycle: int = 10, circularity_min: float = 0.5, circularity_max: float = 1.0) -> bool:
     """Detect roundabout by finding a cycle in the lane successor graph (~2pi total turn)."""
     lane_segs = avm.vector_lane_segments
     successors = {lid: seg.successors for lid, seg in lane_segs.items()}
@@ -115,7 +115,7 @@ def is_roundabout(avm: ArgoverseStaticMap, min_cycle: int = 3, max_cycle: int = 
         total_turn = sum(curvature_cache.get(lid, 0.0) for lid in cycle)
         if abs(total_turn) > 4.0:
             circularity = cycle_circularity(cycle)
-            if circularity >= circularity_threshold:
+            if circularity_min <= circularity <= circularity_max:
                 return True
 
     return False

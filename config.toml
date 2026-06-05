@@ -14,6 +14,8 @@ num_stops_max = 150
 has_crosswalk = false
 has_roundabout = false
 has_intersection = false
+roundabout_circularity_min = 0.5
+roundabout_circularity_max = 1.0
 goal_results = 10
 max_scans = 5000
 
@@ -33,6 +35,8 @@ num_stops_max = 500
 has_crosswalk = false
 has_roundabout = true
 has_intersection = false
+roundabout_circularity_min = 0.35
+roundabout_circularity_max = 0.85
 scan_offset = 1850
 goal_results = 3
 max_scans = 500

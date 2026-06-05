@@ -186,8 +186,8 @@ def apply_filters(scenario, filters: dict, avm, features: dict) -> bool:
     if has_roundabout:
         if features.get("fake_roundabout"):
             return False
-        circularity_threshold = filters.get("roundabout_circularity", 0.95)
-        if not is_roundabout(avm, circularity_threshold=circularity_threshold):
+        circularity_min, circularity_max = filters.get("roundabout_circularity", (0.5, 1.0))
+        if not is_roundabout(avm, circularity_min=circularity_min, circularity_max=circularity_max):
             return False
 
     # has intersection

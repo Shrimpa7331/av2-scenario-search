@@ -54,7 +54,10 @@ def _apply_preset_to_state(preset: dict):
     st.session_state["filter_has_crosswalk"] = bool(preset.get("has_crosswalk", False))
     st.session_state["filter_has_roundabout"] = bool(preset.get("has_roundabout", False))
     st.session_state["filter_has_intersection"] = bool(preset.get("has_intersection", False))
-    st.session_state["filter_roundabout_circularity"] = float(preset.get("roundabout_circularity", 0.95))
+    st.session_state["filter_roundabout_circularity"] = (
+        float(preset.get("roundabout_circularity_min", 0.5)),
+        float(preset.get("roundabout_circularity_max", 1.0)),
+    )
     st.session_state["filter_scan_offset"] = int(preset.get("scan_offset", 0))
     st.session_state["filter_goal_results"] = int(preset.get("goal_results", 10))
     st.session_state["filter_max_scans"] = int(preset.get("max_scans", 1000))
@@ -157,14 +160,15 @@ def render_sidebar() -> dict:
     )
     if has_roundabout:
         roundabout_circularity = st.sidebar.slider(
-            "Circularity threshold",
+            "Circularity range",
             min_value=0.1, max_value=1.0,
+            value=(0.5, 1.0),
             key="filter_roundabout_circularity",
             step=0.05,
-            help="How circular the roundabout must be (0.99 = near-perfect circle). Lower = more permissive."
+            help="Accepted circularity range (1.0 = perfect circle). Narrow the range to be more selective."
         )
     else:
-        roundabout_circularity = st.session_state.get("filter_roundabout_circularity", 0.95)
+        roundabout_circularity = st.session_state.get("filter_roundabout_circularity", (0.5, 1.0))
     has_intersection = st.sidebar.checkbox(
         "Must have intersection",
         key="filter_has_intersection"
@@ -219,6 +223,8 @@ def render_sidebar() -> dict:
             "has_crosswalk": has_crosswalk,
             "has_roundabout": has_roundabout,
             "has_intersection": has_intersection,
+            "roundabout_circularity_min": roundabout_circularity[0],
+            "roundabout_circularity_max": roundabout_circularity[1],
             "scan_offset": int(scan_offset),
             "goal_results": int(goal_results),
             "max_scans": int(max_scans),
