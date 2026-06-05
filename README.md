@@ -58,7 +58,7 @@ Then open the URL shown in the terminal (typically http://localhost:8501) in you
 
 ## Sample Data
 
-The `miami_scenarios/` folder contains a small subset of Argoverse 2 scenarios recorded in Miami, USA. This is sufficient to test all features of the tool. The full dataset can be downloaded from https://www.argoverse.org/av2.html — these sample scenarios are a direct subset of the motion forecasting training split.
+The `miami_scenarios/` folder contains a small subset of Argoverse 2 scenarios recorded in Miami, USA. This is sufficient to test all features of the tool. The full dataset can be downloaded from https://www.argoverse.org/av2.html, these sample scenarios are a direct subset of the motion forecasting training split.
 
 ---
 
