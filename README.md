@@ -83,6 +83,6 @@ This copies up to 500 Miami scenarios into a new folder called `miami_scenarios/
 ## Assumptions and Limitations
 
 - Roundabout detection uses a graph-cycle + circularity heuristic and may produce false positives on complex intersections. Use the flag system in the UI to mark and correct these.
-- Stop sign counts are estimated (not directly available in AV2 map data).
+- Stop sign counts are estimated
 - The tool is designed for local use with a downloaded copy of the dataset, it does not stream data from the internet.
 - Tested on Windows with Python 3.11.
